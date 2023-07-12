@@ -1,8 +1,9 @@
 #! /usr/bin/env bash
 
 ## preamble
-this_dir=$(cd $(dirname ${BASH_SOURCE[0]}) && pwd)
-root_dir=$(cd ${this_dir}/.. && pwd)
+## this_dir=$(cd $(dirname ${BASH_SOURCE[0]}) && pwd)
+this_dir=$(pwd)
+root_dir=$HOME
 ssh_key_path=${root_dir}/.ssh
 if [[ -e ${this_dir}/.env ]]; then source ${this_dir}/.env; fi
 source ${this_dir}/lib/aws.sh

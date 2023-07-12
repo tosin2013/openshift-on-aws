@@ -7,9 +7,14 @@ Provision OpenShift clusters. User installs infrastructure.
 `deploy.sh` deploys a cluster as follows:
 
 1. Generate OpenShift manifests, adjust as required and embed into CoreOS Ignition configs.
-1. Orchestrate a series of CloudFormation stack deployments as described
+2. Orchestrate a series of CloudFormation stack deployments as described
    [here](https://github.com/openshift/installer/tree/master/upi/aws/cloudformation).
-1. Finalize cluster installation using `openshift-install wait-for`.
+3. Finalize cluster installation using `openshift-install wait-for`.
+
+```bash
+$ ./upi/generate_env.sh  
+$ ./deploy.sh
+```
 
 Unlike installer-provisioned infrastructure, with UPI the human installer must
 configure machines to initialize themselves from CoreOS Ignition configs.
@@ -25,8 +30,8 @@ Alternatively, find config files in `_workdir/auth`.
 
 ## More resources
 
-- [Starting doc](https://docs.openshift.com/container-platform/4.10/installing/installing_aws/installing-aws-user-infra.html)
-- [Troubleshooting installations](https://docs.openshift.com/container-platform/4.10/support/troubleshooting/troubleshooting-installations.html)
+- [Starting doc](https://docs.openshift.com/container-platform/4.13/installing/installing_aws/installing-aws-user-infra.html)
+- [Troubleshooting installations](https://docs.openshift.com/container-platform/4.13/support/troubleshooting/troubleshooting-installations.html)
 - CFN templates for AWS UPI: <https://github.com/openshift/installer/tree/master/upi/aws/cloudformation>
     - [Official docs](https://docs.openshift.com/container-platform/4.10/installing/installing_aws/installing-aws-user-infra.html#installation-cloudformation-vpc_installing-aws-user-infra)
     - [GitHub docs](https://github.com/openshift/installer/blob/master/docs/user/aws/install_upi.md)
