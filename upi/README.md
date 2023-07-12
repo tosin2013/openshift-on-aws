@@ -12,7 +12,8 @@ Provision OpenShift clusters. User installs infrastructure.
 3. Finalize cluster installation using `openshift-install wait-for`.
 
 ```bash
-$ ./upi/generate_env.sh  
+$ cd $HOME/openshift-on-aws/upi
+$ ./generate_env.sh  
 $ ./deploy.sh
 ```
 
