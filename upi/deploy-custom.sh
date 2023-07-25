@@ -2,6 +2,8 @@
 
 ## preamble
 ## this_dir=$(cd $(dirname ${BASH_SOURCE[0]}) && pwd)
+export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+set -x
 this_dir=$(pwd)
 root_dir=$HOME
 ssh_key_path=${root_dir}/.ssh
@@ -55,6 +57,7 @@ echo "INFO: using AMI ID ${REGIONAL_RHCOS_AMI_ID}, name ${ami_name}"
 ## provision infrastructure
 echo "INFO: provision infrastructure"
 stages=(
+    "02_cluster_infra_custom"
     "03_cluster_security"
     "04_cluster_bootstrap"
     "05_cluster_master_nodes"
@@ -64,24 +67,24 @@ stages=(
 ## -----------------
 ## 01_vpc
 ##
-stack_name=${stages[0]}
-echo "INFO: ensure cfn stack \"${stack_name}\""
-ensure_stack ${stack_name} "${this_dir}/cfn"
-await_stack ${stack_name}
+#stack_name=${stages[0]}
+#echo "INFO: ensure cfn stack \"${stack_name}\""
+#ensure_stack ${stack_name} "${this_dir}/cfn"
+#await_stack ${stack_name}
 
 # outputs
-stack_short_name=$(echo "${stack_name}" | sed -E 's/^[0-9]{2}_//')
-stack_outputs=$(aws cloudformation describe-stacks --stack-name "${stack_short_name}" --output json | jq '.Stacks[0].Outputs')
-export VPC_ID=$(get_value_from_outputs "${stack_outputs}" "VpcId")
-export PUBLIC_SUBNET_IDS=$(get_value_from_outputs "${stack_outputs}" "PublicSubnetIds")
-export PRIVATE_SUBNET_IDS=$(get_value_from_outputs "${stack_outputs}" "PrivateSubnetIds")
+#stack_short_name=$(echo "${stack_name}" | sed -E 's/^[0-9]{2}_//')
+#stack_outputs=$(aws cloudformation describe-stacks --stack-name "cluster-security" --output json | jq '.Stacks[0].Outputs')
+#export VPC_ID=$(get_value_from_outputs "${stack_outputs}" "VpcId")
+#export PUBLIC_SUBNET_IDS=$(get_value_from_outputs "${stack_outputs}" "PublicSubnetIds")
+#export PRIVATE_SUBNET_IDS=$(get_value_from_outputs "${stack_outputs}" "PrivateSubnetIds")
 
 ## -----------------
 ## 02_cluster_infra
 ##
-stack_name=${stages[1]}
+stack_name=${stages[0]}
 echo "INFO: ensure cfn stack \"${stack_name}\""
-cat "${this_dir}/cfn/${stack_name}_params.json.tpl" | envsubst > "${this_dir}/cfn/${stack_name}_params.json"
+cat "${this_dir}/cfn/${stack_name}_params.json.tpl" | envsubst > "${this_dir}/cfn/${stack_name}_params.json" || exit $?
 ensure_stack ${stack_name} "${this_dir}/cfn"
 await_stack ${stack_name}
 
@@ -91,7 +94,11 @@ export NLB_LAMBDA_ARN=$(get_value_from_outputs "${stack_outputs}" "RegisterNlbIp
 export EXT_API_TARGETGROUP_ARN=$(get_value_from_outputs "${stack_outputs}" "ExternalApiTargetGroupArn")
 export INT_API_TARGETGROUP_ARN=$(get_value_from_outputs "${stack_outputs}" "InternalApiTargetGroupArn")
 export INT_SVC_TARGETGROUP_ARN=$(get_value_from_outputs "${stack_outputs}" "InternalServiceTargetGroupArn")
-export ROUTE53_PRIVATE_HOSTEDZONE_ID=$(get_value_from_outputs "${stack_outputs}" "PrivateHostedZoneId")
+export API_ENDPOINTNAME=$(get_value_from_outputs "${stack_outputs}" "ExtApiElb.LoadBalancerFullName")
+export APPS_ENDPOINTNAME=$(get_value_from_outputs "${stack_outputs}" "ExtApiElb.LoadBalancerFullName")
+
+
+#export ROUTE53_PRIVATE_HOSTEDZONE_ID=$(get_value_from_outputs "${stack_outputs}" "PrivateHostedZoneId")
 # ExternalApiLoadBalancerName
 # InternalApiLoadBalancerName
 # ApiServerDnsName
@@ -99,15 +106,17 @@ export ROUTE53_PRIVATE_HOSTEDZONE_ID=$(get_value_from_outputs "${stack_outputs}"
 ## -----------------
 ## 03_cluster_security
 ##
-stack_name=${stages[2]}
+stack_name=${stages[1]}
 echo "INFO: ensure cfn stack \"${stack_name}\""
 cat "${this_dir}/cfn/${stack_name}_params.json.tpl" | envsubst > "${this_dir}/cfn/${stack_name}_params.json"
 ensure_stack ${stack_name} "${this_dir}/cfn"
 await_stack ${stack_name}
 
 # outputs
-stack_outputs=$(aws cloudformation describe-stacks --stack-name "$(fix_stack_name ${stack_name})" --output json | jq '.Stacks[0].Outputs')
+aws cloudformation describe-stacks --stack-name "cluster-security" --output json | jq '.Stacks[0].Outputs'
+stack_outputs=$(aws cloudformation describe-stacks --stack-name "cluster-security" --output json | jq '.Stacks[0].Outputs')
 export MASTER_SG_ID=$(get_value_from_outputs "${stack_outputs}" "MasterSecurityGroupId")
+echo "INFO: master security group: ${MASTER_SG_ID}" || exit 1
 export MASTER_INSTANCE_PROFILE=$(get_value_from_outputs "${stack_outputs}" "MasterInstanceProfile")
 export WORKER_SG_ID=$(get_value_from_outputs "${stack_outputs}" "WorkerSecurityGroupId")
 export WORKER_INSTANCE_PROFILE=$(get_value_from_outputs "${stack_outputs}" "WorkerInstanceProfile")
@@ -115,43 +124,61 @@ export WORKER_INSTANCE_PROFILE=$(get_value_from_outputs "${stack_outputs}" "Work
 ## -----------------
 ## 04_cluster_bootstrap
 ##
-if [[ -e ${workdir}/auth/kubeconfig ]]; then
-    ## bootstrap machine is deleted after use, so it may be missing although cluster exists
-    echo "INFO: skipping bootstrap stack"
+#if [[ -e ${workdir}/auth/kubeconfig ]]; the
+stack_name=${stages[2]}
+echo "INFO: ensure cfn stack \"${stack_name}\""
+
+# public subnet
+#IFS=',' read -a public_subnets <<< ${PUBLIC_SUBNET_IDS}
+#export PUBLIC_SUBNET_01="${public_subnets[0]}"
+echo ${API_ENDPOINTNAME}
+echo ${APPS_ENDPOINTNAME}
+echo api.${CLUSTER_NAME}.${BASE_DOMAIN}
+echo *.apps.${CLUSTER_NAME}.${BASE_DOMAIN}
+# Prompt the user to continue
+read -p "Do you want to continue? (y/n): " choice
+
+# Check the user's choice
+if [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
+    echo "Continuing with the script..."
+    # Add your further script logic here
 else
-    stack_name=${stages[3]}
-    echo "INFO: ensure cfn stack \"${stack_name}\""
-
-    # public subnet
-    IFS=',' read -a public_subnets <<< ${PUBLIC_SUBNET_IDS}
-    export PUBLIC_SUBNET_01="${public_subnets[0]}"
-
-    # create Ignition configs
-    # upload bootstrap.ign to bucket named BOOTSTRAP_IGNITION_BUCKET_NAME
-    openshift-install create ignition-configs --dir "${workdir}"
-    export BOOTSTRAP_IGNITION_BUCKET_NAME=${INFRASTRUCTURE_NAME}-bootstrap
-    aws s3 mb s3://${BOOTSTRAP_IGNITION_BUCKET_NAME}
-    aws s3 cp ${workdir}/bootstrap.ign s3://${BOOTSTRAP_IGNITION_BUCKET_NAME}/bootstrap.ign 
-    cat "${this_dir}/cfn/${stack_name}_params.json.tpl" | envsubst > "${this_dir}/cfn/${stack_name}_params.json"
-    ensure_stack ${stack_name} "${this_dir}/cfn"
-    await_stack ${stack_name}
-
-    # outputs
-    stack_outputs=$(aws cloudformation describe-stacks --stack-name "$(fix_stack_name ${stack_name})" --output json | jq '.Stacks[0].Outputs')
-    # BootstrapInstanceId
-    # BootstrapPublicIp
-    # BootstrapPrivateIp
+    echo "Script terminated."
 fi
+
+
+# create Ignition configs
+# upload bootstrap.ign to bucket named BOOTSTRAP_IGNITION_BUCKET_NAME
+openshift-install create ignition-configs --dir "${workdir}"
+export BOOTSTRAP_IGNITION_BUCKET_NAME=${INFRASTRUCTURE_NAME}-bootstrap
+aws s3 mb s3://${BOOTSTRAP_IGNITION_BUCKET_NAME}
+aws s3 cp ${workdir}/bootstrap.ign s3://${BOOTSTRAP_IGNITION_BUCKET_NAME}/bootstrap.ign 
+stack_outputs=$(aws cloudformation describe-stacks --stack-name "cluster-security" --output json | jq '.Stacks[0].Outputs')
+export MASTER_SG_ID=$(get_value_from_outputs "${stack_outputs}" "MasterSecurityGroupId")
+echo "INFO: master security group: ${MASTER_SG_ID}" || exit 1
+export MASTER_INSTANCE_PROFILE=$(get_value_from_outputs "${stack_outputs}" "MasterInstanceProfile")
+export WORKER_SG_ID=$(get_value_from_outputs "${stack_outputs}" "WorkerSecurityGroupId")
+export WORKER_INSTANCE_PROFILE=$(get_value_from_outputs "${stack_outputs}" "WorkerInstanceProfile")
+cat "${this_dir}/cfn/${stack_name}_params.json.tpl" | envsubst > "${this_dir}/cfn/${stack_name}_params.json"
+cat ${this_dir}/cfn/${stack_name}_params.json || exit $?
+ensure_stack ${stack_name} "${this_dir}/cfn"
+await_stack ${stack_name}
+
+# outputs
+stack_outputs=$(aws cloudformation describe-stacks --stack-name "$(fix_stack_name ${stack_name})" --output json | jq '.Stacks[0].Outputs')
+# BootstrapInstanceId
+# BootstrapPublicIp
+# BootstrapPrivateIp
 
 ## -----------------
 ## 05_cluster_master_nodes
 ##
-stack_name=${stages[4]}
+stack_name=${stages[3]}
 echo "INFO: ensure cfn stack \"${stack_name}\""
 
 ## master subnets, CA
-IFS=',' read -a private_subnets <<< ${PRIVATE_SUBNET_IDS}
-export PRIVATE_SUBNET_01="${private_subnets[0]}"
+#IFS=',' read -a private_subnets <<< ${PRIVATE_SUBNET_IDS}
+#export PRIVATE_SUBNET_01="${private_subnets[0]}"
 export CA=$(cat ${workdir}/master.ign | jq -r '.ignition.security.tls.certificateAuthorities[0].source')
 
 cat "${this_dir}/cfn/${stack_name}_params.json.tpl" | envsubst > "${this_dir}/cfn/${stack_name}_params.json"
@@ -165,9 +192,10 @@ await_stack ${stack_name}
 ## -----------------
 ## 06_cluster_worker_node
 ##
-stack_name=${stages[5]}
+stack_name=${stages[4]}
 echo "INFO: ensure cfn stack \"${stack_name}\""
 cat "${this_dir}/cfn/${stack_name}_params.json.tpl" | envsubst > "${this_dir}/cfn/${stack_name}_params.json"
+exit 1
 ensure_stack ${stack_name} "${this_dir}/cfn"
 await_stack ${stack_name}
 

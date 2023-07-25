@@ -188,3 +188,5 @@ csrs_pid=$!
 trap "kill ${csrs_pid}" EXIT
 
 openshift-install --dir ${workdir} wait-for install-complete --log-level=debug
+
+ rm -rf _workdir/

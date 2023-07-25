@@ -16,13 +16,6 @@ Parameters:
     ConstraintDescription: Infrastructure name must be alphanumeric, start with a letter, and have a maximum of 27 characters.
     Description: A short, unique cluster ID used to tag cloud resources and identify items owned or used by the cluster.
     Type: String
-  HostedZoneId:
-    Description: The Route53 public zone ID to register the targets with, such as Z21IXYZABCZ2A4.
-    Type: String
-  HostedZoneName:
-    Description: The Route53 zone to register the targets with, such as example.com. Omit the trailing period.
-    Type: String
-    Default: "example.com"
   PublicSubnets:
     Description: The internet-facing subnets.
     Type: List<AWS::EC2::Subnet::Id>
@@ -47,11 +40,6 @@ Metadata:
       - VpcId
       - PublicSubnets
       - PrivateSubnets
-    - Label:
-        default: "DNS"
-      Parameters:
-      - HostedZoneName
-      - HostedZoneId
     ParameterLabels:
       ClusterName:
         default: "Cluster Name"
@@ -63,10 +51,6 @@ Metadata:
         default: "Public Subnets"
       PrivateSubnets:
         default: "Private Subnets"
-      HostedZoneName:
-        default: "Public Hosted Zone Name"
-      HostedZoneId:
-        default: "Public Hosted Zone ID"
 
 Resources:
   ExtApiElb:
@@ -77,7 +61,14 @@ Resources:
       Subnets: !Ref PublicSubnets
       Type: network
 
-
+  IntApiElb:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Join ["-", [!Ref InfrastructureName, "int"]]
+      Scheme: internal
+      IpAddressType: ipv4
+      Subnets: !Ref PrivateSubnets
+      Type: network
 
   ExternalApiListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
@@ -309,18 +300,12 @@ Resources:
       Subnets: !Ref PrivateSubnets
 
 Outputs:
-  PrivateHostedZoneId:
-    Description: Hosted zone ID for the private DNS, which is required for private records.
-    Value: !Ref IntDns
   ExternalApiLoadBalancerName:
     Description: Full name of the external API load balancer.
     Value: !GetAtt ExtApiElb.LoadBalancerFullName
   InternalApiLoadBalancerName:
     Description: Full name of the internal API load balancer.
     Value: !GetAtt IntApiElb.LoadBalancerFullName
-  ApiServerDnsName:
-    Description: Full hostname of the API server, which is required for the Ignition config files.
-    Value: !Join [".", ["api-int", !Ref ClusterName, !Ref HostedZoneName]]
   RegisterNlbIpTargetsLambda:
     Description: Lambda ARN useful to help register or deregister IP targets for these load balancers.
     Value: !GetAtt RegisterNlbIpTargets.Arn

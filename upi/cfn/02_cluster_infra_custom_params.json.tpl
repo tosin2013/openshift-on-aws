@@ -1,19 +1,15 @@
 [
   {
     "ParameterKey": "ClusterName", 
-    "ParameterValue": "${CLUSTER_NAME}" 
+    "ParameterValue":"${CLUSTER_NAME}"
   },
   {
     "ParameterKey": "InfrastructureName", 
     "ParameterValue": "${INFRASTRUCTURE_NAME}" 
   },
   {
-    "ParameterKey": "HostedZoneName", 
-    "ParameterValue": "${BASE_DOMAIN}" 
-  },
-  {
     "ParameterKey": "PublicSubnets", 
-    "ParameterValue": "${PUBLIC_SUBNET_IDS}" 
+    "ParameterValue": "${PUBLIC_SUBNET_01}" 
   },
   {
     "ParameterKey": "PrivateSubnets", 
