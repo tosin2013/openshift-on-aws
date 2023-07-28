@@ -25,8 +25,8 @@ OPENSHIFT_PULL_SECRET=$(read_input "Enter the OPENSHIFT_PULL_SECRET" "")
 # Read PUBLIC_SUBNET_01 and PRIVATE_SUBNET_01 interactively
 PUBLIC_SUBNET_01=$(read_input "Enter the PUBLIC_SUBNET_01" "subnet-12345678")
 PRIVATE_SUBNET_01=$(read_input "Enter the PRIVATE_SUBNET_01" "subnet-98765432")
+VPC_ID=$(read_input "Enter the VPC_ID" "vpc-XXXXXXX")
 
-VPC_ID
 
 # Export the variables to a .env file
 cat > .env <<EOF
@@ -39,6 +39,8 @@ export OPENSHIFT_PULL_SECRET='$OPENSHIFT_PULL_SECRET'
 export PUBLIC_SUBNET_01="$PUBLIC_SUBNET_01"
 export PRIVATE_SUBNET_01="$PRIVATE_SUBNET_01"
 export PRIVATE_SUBNET_IDS="$PRIVATE_SUBNET_01"
+export INFRASTRUCTURE_NAME="$CLUSTER_NAME"
+export VPC_ID="$VPC_ID"
 EOF
 
 echo ".env file created successfully!"

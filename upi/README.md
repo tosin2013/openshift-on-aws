@@ -23,6 +23,8 @@ configure machines to initialize themselves from CoreOS Ignition configs.
 To destroy the cluster, run `destroy.sh` to delete the created CloudFormation
 stacks in reverse order of creation.
 
+delete _work_dir after destroying cloudformation templates `rm -rf _workdir`
+
 ## Use cluster
 
 As with installer-provisioned infrastructure (IPI), credentials and URLs are

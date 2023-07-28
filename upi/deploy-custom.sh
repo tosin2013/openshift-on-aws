@@ -32,7 +32,22 @@ fi
 export SSH_PUBLIC_KEY="$(cat ${ssh_key_path}/id_rsa.pub)"
 cat ${this_dir}/install-config.yaml.tpl | envsubst 1> ${workdir}/install-config.yaml
 openshift-install create manifests --dir "${workdir}"
+#mkdir _workdir
+#cp -avi _backup_workdir/* _workdir
+#cp -avi _backup_workdir/.* _workdir
 
+echo "Remove privatezone and publiczone from cluster-dns-02-config.yml"
+echo "_workdir/manifests/cluster-dns-02-config.yml"
+read -p "Do you want to continue? (y/n): " choice
+
+# Check the user's choice
+if [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
+
+    echo "Continuing with the script..."
+    # Add your further script logic here
+else
+    echo "Script terminated."
+fi
 ## remove installer-provisioned machines
 rm -f ${workdir}/openshift/99_openshift-cluster-api_master-machines-*.yaml
 rm -f ${workdir}/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
@@ -116,7 +131,6 @@ await_stack ${stack_name}
 aws cloudformation describe-stacks --stack-name "cluster-security" --output json | jq '.Stacks[0].Outputs'
 stack_outputs=$(aws cloudformation describe-stacks --stack-name "cluster-security" --output json | jq '.Stacks[0].Outputs')
 export MASTER_SG_ID=$(get_value_from_outputs "${stack_outputs}" "MasterSecurityGroupId")
-echo "INFO: master security group: ${MASTER_SG_ID}" || exit 1
 export MASTER_INSTANCE_PROFILE=$(get_value_from_outputs "${stack_outputs}" "MasterInstanceProfile")
 export WORKER_SG_ID=$(get_value_from_outputs "${stack_outputs}" "WorkerSecurityGroupId")
 export WORKER_INSTANCE_PROFILE=$(get_value_from_outputs "${stack_outputs}" "WorkerInstanceProfile")
@@ -131,15 +145,12 @@ echo "INFO: ensure cfn stack \"${stack_name}\""
 # public subnet
 #IFS=',' read -a public_subnets <<< ${PUBLIC_SUBNET_IDS}
 #export PUBLIC_SUBNET_01="${public_subnets[0]}"
-echo ${API_ENDPOINTNAME}
-echo ${APPS_ENDPOINTNAME}
-echo api.${CLUSTER_NAME}.${BASE_DOMAIN}
-echo *.apps.${CLUSTER_NAME}.${BASE_DOMAIN}
-# Prompt the user to continue
+echo "Manually Review AWS Envionment"
 read -p "Do you want to continue? (y/n): " choice
 
 # Check the user's choice
 if [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
+
     echo "Continuing with the script..."
     # Add your further script logic here
 else
@@ -150,6 +161,20 @@ fi
 # create Ignition configs
 # upload bootstrap.ign to bucket named BOOTSTRAP_IGNITION_BUCKET_NAME
 openshift-install create ignition-configs --dir "${workdir}"
+# Prompt the user to continue
+echo "Manually Review AWS Envionment"
+read -p "Do you want to continue? (y/n): " choice
+
+# Check the user's choice
+if [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
+
+    echo "Continuing with the script..."
+    # Add your further script logic here
+else
+    echo "Script terminated."
+    exit 1
+fi
+
 export BOOTSTRAP_IGNITION_BUCKET_NAME=${INFRASTRUCTURE_NAME}-bootstrap
 aws s3 mb s3://${BOOTSTRAP_IGNITION_BUCKET_NAME}
 aws s3 cp ${workdir}/bootstrap.ign s3://${BOOTSTRAP_IGNITION_BUCKET_NAME}/bootstrap.ign 
@@ -195,7 +220,6 @@ await_stack ${stack_name}
 stack_name=${stages[4]}
 echo "INFO: ensure cfn stack \"${stack_name}\""
 cat "${this_dir}/cfn/${stack_name}_params.json.tpl" | envsubst > "${this_dir}/cfn/${stack_name}_params.json"
-exit 1
 ensure_stack ${stack_name} "${this_dir}/cfn"
 await_stack ${stack_name}
 
