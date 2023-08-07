@@ -13,7 +13,7 @@ Provision OpenShift clusters. User installs infrastructure.
 
 ```bash
 $ cd $HOME/openshift-on-aws/upi
-$ ./generate_env.sh  
+$ ./deploy-custom.sh
 $ ./deploy.sh
 ```
 
